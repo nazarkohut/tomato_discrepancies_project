@@ -16,6 +16,26 @@ Example:
     os.system(f"onnxslim {f} {f} && open {f}")  # pip install onnxslim
     ```
 """
+from .conv import (
+    TripletAttention,
+    OriginalCBAM,
+    ECA,
+    SIMAM,
+    CBAM,
+    ChannelAttention,
+    Concat,
+    Conv,
+    Conv2,
+    ConvTranspose,
+    DWConv,
+    DWConvTranspose2d,
+    Focus,
+    GhostConv,
+    Index,
+    LightConv,
+    RepConv,
+    SpatialAttention,
+)
 
 from .block import (
     C1,
@@ -58,22 +78,6 @@ from .block import (
     SCDown,
     TorchVision,
 )
-from .conv import (
-    CBAM,
-    ChannelAttention,
-    Concat,
-    Conv,
-    Conv2,
-    ConvTranspose,
-    DWConv,
-    DWConvTranspose2d,
-    Focus,
-    GhostConv,
-    Index,
-    LightConv,
-    RepConv,
-    SpatialAttention,
-)
 from .head import OBB, Classify, Detect, Pose, RTDETRDecoder, Segment, WorldDetect, v10Detect
 from .transformer import (
     AIFI,
@@ -89,6 +93,10 @@ from .transformer import (
 )
 
 __all__ = (
+    "OriginalCBAM",
+    "TripletAttention",
+    "ECA",
+    "SIMAM",
     "Conv",
     "Conv2",
     "LightConv",

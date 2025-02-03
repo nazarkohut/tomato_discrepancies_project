@@ -8,6 +8,10 @@ import torch
 import torch.nn as nn
 
 __all__ = (
+    "OriginalCBAM",
+    "TripletAttention",
+    "ECA",
+    "SIMAM",
     "Conv",
     "Conv2",
     "LightConv",
@@ -23,6 +27,149 @@ __all__ = (
     "RepConv",
     "Index",
 )
+
+class OriginalChannelAttention(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(OriginalChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Conv2d(channel, channel // reduction, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channel // reduction, channel, 1, bias=False)
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        out = avg_out + max_out
+        return x * self.sigmoid(out)
+
+
+class OriginalSpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(OriginalSpatialAttention, self).__init__()
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        out = torch.concat([avg_out, max_out], dim=1)
+        out = self.conv(out)
+        return x * self.sigmoid(out)
+
+
+class OriginalCBAM(nn.Module):
+    def __init__(self, channel, reduction=16, kernel_size=7):
+        super().__init__()
+        self.ca = OriginalChannelAttention(channel, reduction)
+        self.sa = OriginalSpatialAttention(kernel_size)
+
+    def forward(self, x):
+        x = self.ca(x)
+        x = self.sa(x)
+        return x
+
+
+class BasicConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, ks):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=ks, stride=1,
+                              padding=(ks - 1) // 2)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
+
+
+## Triple attention
+class ZPool(nn.Module):
+    def forward(self, x):
+        x_mean = x.mean(dim=1, keepdim=True)
+        x_max = x.max(dim=1, keepdim=True)[0]
+        return torch.cat([x_mean, x_max], dim=1)
+
+
+class AttentionGate(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        self.compress = ZPool()
+        self.conv = BasicConv2d(2, 1, kernel_size)
+        self.activation = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.compress(x)
+        y = self.conv(y)
+        y = self.activation(y)
+        return x * y
+
+
+class TripletAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        self.ch = AttentionGate(kernel_size)
+        self.cw = AttentionGate(kernel_size)
+        self.hw = AttentionGate(kernel_size)
+        print(f"TripletAttention kernel size: {kernel_size}")
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        x_ch = self.ch(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)  # c and h
+        x_cw = self.cw(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+        x_hw = self.hw(x)
+        return 1 / 3 * (x_ch + x_cw + x_hw)
+
+
+class SIMAM(torch.nn.Module):
+    """
+    Implementation of SIMAM from original paper: https://github.com/ZjjConan/SimAM/blob/master/networks/attentions/simam_module.py
+    """
+    def __init__(self, channels=None, e_lambda=1e-4):
+        super(SIMAM, self).__init__()
+
+        self.activation = nn.Sigmoid()
+        self.e_lambda = e_lambda
+
+    def __repr__(self):
+        s = self.__class__.__name__ + '('
+        s += ('lambda=%f)' % self.e_lambda)
+        return s
+
+    @staticmethod
+    def get_module_name():
+        return "simam"
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+
+        n = w * h - 1
+
+        x_minus_mu_square = (x - x.mean(dim=[2, 3], keepdim=True)).pow(2)
+        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2, 3], keepdim=True) / n + self.e_lambda)) + 0.5
+
+        return x * self.activation(y)
+
+
+class ECA(nn.Module):
+    def __init__(self, channels, gamma=2, b=1):
+        super().__init__()
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        t = int(abs((math.log(channels, 2) + b) / gamma))
+        k = t if t % 2 else t + 1
+        self.conv = nn.Conv1d(1, 1, kernel_size=k, padding=(k - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.avgpool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+        y = self.sigmoid(y)
+        return x * y.expand_as(x)
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
