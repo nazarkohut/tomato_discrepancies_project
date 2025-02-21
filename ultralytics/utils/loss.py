@@ -163,7 +163,8 @@ class v8DetectionLoss:
         h = model.args  # hyperparameters
 
         m = model.model[-1]  # Detect() module
-        manual_class_weights = torch.tensor([0.65947242, 1.39492754, 1.30420054]).to(device)
+        # manual_class_weights = torch.tensor([0.65947242, 1.39492754, 1.30420054]).to(device)
+        manual_class_weights = torch.tensor([2.92732558, 1.21618357, 2.89367816, 0.40151515]).to(device)
         self.bce = nn.BCEWithLogitsLoss(reduction="none", pos_weight=manual_class_weights)
         self.hyp = h
         self.stride = m.stride  # model strides
