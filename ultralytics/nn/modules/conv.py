@@ -26,6 +26,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "QuadroWeightedAttention"
 )
 
 class OriginalChannelAttention(nn.Module):
@@ -170,6 +171,24 @@ class ECA(nn.Module):
         y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
         y = self.sigmoid(y)
         return x * y.expand_as(x)
+
+
+class QuadroWeightedAttention(nn.Module):
+    def __init__(self, channels, kernel_size=3):
+        super().__init__()
+        self.ta3 = TripletAttention(kernel_size=kernel_size)
+        self.eca = ECA(channels)
+        self.weight = nn.Parameter(torch.ones(1))
+
+    def forward(self, x):
+        eca_weight = self.sigmoid(self.weight)
+        ta3_weight = 1 - eca_weight
+        print(ta3_weight)
+        print(eca_weight)
+        print(f"weight_sum: {ta3_weight + eca_weight}")
+        eca = self.eca(x)
+        ta3 = self.ta3(x)
+        return eca_weight * eca + ta3_weight * ta3
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation

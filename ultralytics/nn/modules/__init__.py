@@ -35,6 +35,7 @@ from .conv import (
     LightConv,
     RepConv,
     SpatialAttention,
+    QuadroWeightedAttention
 )
 
 from .block import (
@@ -168,4 +169,5 @@ __all__ = (
     "PSA",
     "TorchVision",
     "Index",
+    "QuadroWeightedAttention"
 )
