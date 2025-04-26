@@ -179,6 +179,7 @@ class QuadroWeightedAttention(nn.Module):
         self.ta3 = TripletAttention(kernel_size=kernel_size)
         self.eca = ECA(channels)
         self.weight = nn.Parameter(torch.ones(1))
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         eca_weight = self.sigmoid(self.weight)
