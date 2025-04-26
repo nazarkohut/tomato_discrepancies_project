@@ -184,9 +184,6 @@ class QuadroWeightedAttention(nn.Module):
     def forward(self, x):
         eca_weight = self.sigmoid(self.weight)
         ta3_weight = 1 - eca_weight
-        print(ta3_weight)
-        print(eca_weight)
-        print(f"weight_sum: {ta3_weight + eca_weight}")
         eca = self.eca(x)
         ta3 = self.ta3(x)
         return eca_weight * eca + ta3_weight * ta3
