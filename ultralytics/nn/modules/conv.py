@@ -26,7 +26,8 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
-    "QuadroWeightedAttention"
+    "QuadroWeightedAttention",
+    "WeightedTripletAttention"
 )
 
 class OriginalChannelAttention(nn.Module):
@@ -172,21 +173,37 @@ class ECA(nn.Module):
         y = self.sigmoid(y)
         return x * y.expand_as(x)
 
+class WeightedTripletAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        self.ch = AttentionGate(kernel_size)
+        self.cw = AttentionGate(kernel_size)
+        self.hw = AttentionGate(kernel_size)
+        self.weight = nn.Parameter(torch.ones(3))
+        print(f"TripletAttention kernel size: {kernel_size}")
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        attention_impact_weights = torch.softmax(self.weights, dim=0)
+        x_ch = self.ch(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)  # c and h
+        x_cw = self.cw(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+        x_hw = self.hw(x)
+        return attention_impact_weights[0] * x_ch + attention_impact_weights[1] * x_cw + attention_impact_weights[1] * x_hw
+
 
 class QuadroWeightedAttention(nn.Module):
     def __init__(self, channels, kernel_size=3):
         super().__init__()
         self.ta3 = TripletAttention(kernel_size=kernel_size)
         self.eca = ECA(channels)
-        self.weight = nn.Parameter(torch.ones(1))
+        self.weight = nn.Parameter(torch.ones(2))
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        eca_weight = self.sigmoid(self.weight)
-        ta3_weight = 1 - eca_weight
+        attention_impact_weights = torch.softmax(self.weights, dim=0)
         eca = self.eca(x)
         ta3 = self.ta3(x)
-        return eca_weight * eca + ta3_weight * ta3
+        return attention_impact_weights[0] * eca + attention_impact_weights[1] * ta3
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
