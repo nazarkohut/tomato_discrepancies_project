@@ -179,7 +179,7 @@ class WeightedTripletAttention(nn.Module):
         self.ch = AttentionGate(kernel_size)
         self.cw = AttentionGate(kernel_size)
         self.hw = AttentionGate(kernel_size)
-        self.weight = nn.Parameter(torch.ones(3))
+        self.weights = nn.Parameter(torch.ones(3))
         print(f"TripletAttention kernel size: {kernel_size}")
 
     def forward(self, x):
@@ -196,7 +196,7 @@ class QuadroWeightedAttention(nn.Module):
         super().__init__()
         self.ta3 = TripletAttention(kernel_size=kernel_size)
         self.eca = ECA(channels)
-        self.weight = nn.Parameter(torch.ones(2))
+        self.weights = nn.Parameter(torch.ones(2))
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
