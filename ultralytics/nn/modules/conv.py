@@ -200,7 +200,7 @@ class QuadroWeightedAttention(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        attention_impact_weights = torch.softmax(self.weights, dim=0)
+        attention_impact_weights = self.sigmoid(self.weights, dim=0)
         eca = self.eca(x)
         ta3 = self.ta3(x)
         return attention_impact_weights[0] * eca + attention_impact_weights[1] * ta3
