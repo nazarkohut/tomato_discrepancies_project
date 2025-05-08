@@ -191,7 +191,7 @@ class WeightedTripletAttention(nn.Module):
         return attention_impact_weights[0] * x_ch + attention_impact_weights[1] * x_cw + attention_impact_weights[1] * x_hw
 
 
-class QuadroWeightedAttention(nn.Module):
+class QuadroWeightedAttentionSigmoidAll(nn.Module):
     def __init__(self, channels, kernel_size=3):
         super().__init__()
         self.ta3 = TripletAttention(kernel_size=kernel_size)
@@ -204,6 +204,22 @@ class QuadroWeightedAttention(nn.Module):
         eca = self.eca(x)
         ta3 = self.ta3(x)
         return attention_impact_weights[0] * eca + attention_impact_weights[1] * ta3
+
+
+class QuadroWeightedAttention(nn.Module):
+    def __init__(self, channels, kernel_size=3):
+        super().__init__()
+        self.ta3 = TripletAttention(kernel_size=kernel_size)
+        self.eca = ECA(channels)
+        self.weight = nn.Parameter(torch.ones(1))
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        eca_weight = self.sigmoid(self.weight)
+        ta3_weight = 1 - eca_weight
+        eca = self.eca(x)
+        ta3 = self.ta3(x)
+        return eca_weight * eca + ta3_weight * ta3
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
